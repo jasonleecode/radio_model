@@ -25,7 +25,7 @@
 |------|------|------|
 | 0 | 执行层：文本→键控音频（兼作训练数据合成器） | ✅ 完成 |
 | 1 | DSP baseline 解码器（建立闭环 + 模型对照基线，**复用为元数据旁路**） | ✅ 完成 |
-| 2 | 决策层状态机（最小自动应答 demo 成立） | 待办 |
+| 2 | 决策层状态机（最小自动应答 demo 成立） | ✅ 完成 |
 | 3 | CRNN+CTC 模型（窄带频谱图，合成数据+增强训练，DSP 作对照） | 待办 |
 | 4 | 真实电台硬化：邻台/衰落/自动增益/选频 | 待办 |
 
@@ -37,12 +37,15 @@
 - `radio_cw/decode_dsp.py` — baseline 解码器（自适应阈值 + 时长聚类 + 查表）。
 - `radio_cw/channel.py` — 信道损伤（白噪声/QSB/QRM），eval 与 stage-3 增强共用。
 - `radio_cw/metrics.py` — 编辑距离 / CER。
+- `radio_cw/decision.py` — 决策层 QSO 状态机 + 模板，SNR→RST，来报解析。
 - `scripts/demo_synth.py` — 渲染消息到 WAV。
 - `scripts/eval_baseline.py` — baseline CER 基准（机器码 vs 人手 fist）。
+- `scripts/demo_qso.py` — 端到端闭环：两台站穿过音频管线完成一次完整通联。
 
 ```bash
 python scripts/demo_synth.py "CQ CQ DE BG1ABC K" --wpm 20 -o cq.wav
 python scripts/eval_baseline.py            # 打印 baseline 对照基准
+python scripts/demo_qso.py --snr 5         # 跑完整 QSO 闭环
 python -m pytest tests/ -q
 ```
 
