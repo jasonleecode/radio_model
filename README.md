@@ -27,7 +27,8 @@
 | 1 | DSP baseline 解码器（建立闭环 + 模型对照基线，**复用为元数据旁路**） | ✅ 完成 |
 | 2 | 决策层状态机（最小自动应答 demo 成立） | ✅ 完成 |
 | 3a | 数据管线：词表/语料/特征/数据集 + 6 维增强 | ✅ 完成 |
-| 3b | CRNN+CTC 模型 + 训练循环 + 对照 baseline 评测 | 待办 |
+| 3b | CRNN+CTC 模型 + 训练循环（smoke test 通过） | 🚧 进行中 |
+| 3c | 正式训练 + 对照 baseline 评测（CER 分桶） | 待办 |
 | 4 | 真实电台硬化：邻台/衰落/自动增益/选频 | 待办 |
 
 ## 已实现
@@ -43,8 +44,11 @@
 - `radio_cw/corpus.py` — 拟真 CW 语料生成器（呼号/RST/话术/缩写）。
 - `radio_cw/features.py` — 窄带 log-频谱图（短窗短跳步，16 bins / 250 Hz）。
 - `radio_cw/dataset.py` — 在线合成数据集 + 6 维增强 + CTC collate + 时长截断。
+- `radio_cw/model.py` — CRNN+CTC 模型（~0.5M 参数，CNN→BiGRU→Linear）。
+- `radio_cw/train.py` — CTC 训练循环 + 贪心解码 CER 监控。
 - `scripts/demo_synth.py` — 渲染消息到 WAV。
 - `scripts/demo_dataset.py` — 检视训练样本与 batch 统计。
+- `scripts/train_model.py` — 训练模型；`--smoke` 跑过拟合自检。
 - `scripts/eval_baseline.py` — baseline CER 基准（机器码 vs 人手 fist）。
 - `scripts/demo_qso.py` — 端到端闭环：两台站穿过音频管线完成一次完整通联。
 
@@ -65,6 +69,14 @@ python -m pytest tests/ -q
 | 人手码 jitter=0.30 @ 10 dB | ~30–36% |
 
 结论：白噪声下机器码 baseline 已近乎完美，**模型的价值集中在人手 fist 节奏**。
+
+## ⚠️ 训练环境注意（GPU）
+
+当前装的是 `torch 2.11+cu130`，但本机 NVIDIA 驱动是 CUDA 12.8，版本太旧，`torch.cuda.is_available()` 为 False，只能 CPU 训练。正式训练（阶段 3c）前需二选一：
+- 装一个匹配驱动的 torch（如 `cu121`/`cu128` 构建），或
+- 升级 NVIDIA 驱动到支持 CUDA 13。
+
+smoke test 在 CPU 上即可跑（~500 步几分钟）。
 
 ## ⚠️ 合规
 
