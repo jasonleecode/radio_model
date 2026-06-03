@@ -27,8 +27,8 @@
 | 1 | DSP baseline 解码器（建立闭环 + 模型对照基线，**复用为元数据旁路**） | ✅ 完成 |
 | 2 | 决策层状态机（最小自动应答 demo 成立） | ✅ 完成 |
 | 3a | 数据管线：词表/语料/特征/数据集 + 6 维增强 | ✅ 完成 |
-| 3b | CRNN+CTC 模型 + 训练循环（smoke test 通过） | 🚧 进行中 |
-| 3c | 正式训练 + 对照 baseline 评测（CER 分桶） | 待办 |
+| 3b | CRNN+CTC 模型 + 训练循环（smoke test 通过） | ✅ 完成 |
+| 3c | 正式训练 + 对照 baseline 评测（CER 分桶） | ✅ 完成 |
 | 4 | 真实电台硬化：邻台/衰落/自动增益/选频 | 待办 |
 
 ## 已实现
@@ -49,6 +49,7 @@
 - `scripts/demo_synth.py` — 渲染消息到 WAV。
 - `scripts/demo_dataset.py` — 检视训练样本与 batch 统计。
 - `scripts/train_model.py` — 训练模型；`--smoke` 跑过拟合自检。
+- `scripts/eval_model.py` — 模型 vs DSP baseline 同数据对照评测（CER 分桶）。
 - `scripts/eval_baseline.py` — baseline CER 基准（机器码 vs 人手 fist）。
 - `scripts/demo_qso.py` — 端到端闭环：两台站穿过音频管线完成一次完整通联。
 
@@ -69,6 +70,28 @@ python -m pytest tests/ -q
 | 人手码 jitter=0.30 @ 10 dB | ~30–36% |
 
 结论：白噪声下机器码 baseline 已近乎完美，**模型的价值集中在人手 fist 节奏**。
+
+### 模型 vs baseline 对照（CRNN 训练 12000 步后，CER %，DSP / 模型）
+
+```bash
+torch_env/bin/python scripts/eval_model.py runs/crnn.pt --n 40
+```
+
+机器码（DSP 在干净时序上精确）：
+
+| WPM | 20dB | 0dB | −3dB |
+|-----|------|-----|------|
+| 20  | 0.0 / 1.0 | 0.0 / 1.1 | 1.6 / 1.1 |
+
+人手 fist @ 10dB（决定性对照）：
+
+| WPM | j=0.0 | j=0.20 | j=0.30 |
+|-----|-------|--------|--------|
+| 15  | 0.0 / 1.1 | 15.7 / **4.0** | 34.8 / **14.9** |
+| 20  | 0.0 / 1.1 | 6.6 / **3.7**  | 32.5 / **15.5** |
+| 30  | 0.0 / 1.0 | 6.9 / **2.4**  | 28.7 / **15.1** |
+
+**诚实结论**：干净机器码上 DSP 略胜（0% vs 模型 ~1% 残差地板）；但人手节奏抖动越大，模型优势越明显（j=0.3 时约 2× 更好），极低 SNR 也略占优。模型恰好在它被设计来对付的"凌乱人手信号"上赢。验证了项目核心假设。
 
 ## ⚠️ 训练环境注意（GPU）
 

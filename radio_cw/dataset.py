@@ -63,6 +63,28 @@ class AugmentConfig:
         }
 
 
+def render_audio(
+    text: str,
+    params: dict,
+    rng: np.random.Generator,
+    sample_rate: int = 8000,
+) -> np.ndarray:
+    """Render text+params to impaired audio (shared by features and DSP eval)."""
+    scfg = SynthConfig(
+        wpm=params["wpm"],
+        sidetone_hz=params["sidetone_hz"],
+        sample_rate=sample_rate,
+        timing_jitter=params.get("timing_jitter", 0.0),
+        weight_bias=params.get("weight_bias", 1.0),
+    )
+    audio, _ = synthesize(text, scfg, rng)
+    if params.get("qsb"):
+        audio = add_qsb(audio, sample_rate, rng)
+    if params.get("snr_db") is not None:
+        audio = add_white_noise(audio, params["snr_db"], rng)
+    return audio
+
+
 def render_features(
     text: str,
     params: dict,
@@ -71,18 +93,7 @@ def render_features(
 ) -> np.ndarray:
     """Render text+params to a (T, F) feature array. Reusable with pinned params."""
     feat_cfg = feat_cfg or FeatureConfig()
-    scfg = SynthConfig(
-        wpm=params["wpm"],
-        sidetone_hz=params["sidetone_hz"],
-        sample_rate=feat_cfg.sample_rate,
-        timing_jitter=params.get("timing_jitter", 0.0),
-        weight_bias=params.get("weight_bias", 1.0),
-    )
-    audio, _ = synthesize(text, scfg, rng)
-    if params.get("qsb"):
-        audio = add_qsb(audio, feat_cfg.sample_rate, rng)
-    if params.get("snr_db") is not None:
-        audio = add_white_noise(audio, params["snr_db"], rng)
+    audio = render_audio(text, params, rng, feat_cfg.sample_rate)
     spec = spectrogram(audio, feat_cfg)  # (F, T)
     return spec.T  # (T, F) for the RNN
 

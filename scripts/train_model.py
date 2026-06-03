@@ -11,8 +11,6 @@ import argparse
 import sys
 from pathlib import Path
 
-import torch
-
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from radio_cw.dataset import AugmentConfig  # noqa: E402
 from radio_cw.train import TrainConfig, train  # noqa: E402
@@ -27,7 +25,10 @@ def main() -> None:
     ap.add_argument("--lr", type=float, default=1e-3)
     ap.add_argument("--train-size", type=int, default=20000)
     ap.add_argument("--device", default="auto")
+    ap.add_argument("--max-seconds", type=float, default=12.0)
+    ap.add_argument("--num-workers", type=int, default=4)
     ap.add_argument("--save", default=None, help="path to save the trained model")
+    ap.add_argument("--save-every", type=int, default=1000)
     args = ap.parse_args()
 
     if args.smoke:
@@ -40,14 +41,13 @@ def main() -> None:
         print("=== SMOKE TEST: overfitting 16 short clean samples ===")
     else:
         cfg = TrainConfig(steps=args.steps, batch_size=args.batch_size, lr=args.lr,
-                          train_size=args.train_size, device=args.device)
-        aug = None
+                          train_size=args.train_size, device=args.device,
+                          max_seconds=args.max_seconds, num_workers=args.num_workers,
+                          save_path=args.save, save_every=args.save_every,
+                          log_every=100)
+        aug = None  # full augmentation (default AugmentConfig)
 
-    model = train(cfg, aug=aug)
-
-    if args.save:
-        torch.save(model.state_dict(), args.save)
-        print(f"saved -> {args.save}")
+    train(cfg, aug=aug)
 
 
 if __name__ == "__main__":

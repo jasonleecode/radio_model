@@ -31,6 +31,9 @@ class TrainConfig:
     grad_clip: float = 5.0
     device: str = "auto"
     max_seconds: float = 20.0  # clip-length cap (smoke test uses short clips)
+    num_workers: int = 2       # DataLoader workers (raise for long GPU runs)
+    save_path: str | None = None
+    save_every: int = 1000     # periodic checkpoint interval (steps)
 
 
 def pick_device(name: str) -> torch.device:
@@ -74,7 +77,8 @@ def train(cfg: TrainConfig, aug: AugmentConfig | None = None,
     ds = CWDataset(vocab, n_samples=cfg.train_size, seed=cfg.seed,
                    aug=aug, feat_cfg=feat_cfg, max_seconds=cfg.max_seconds)
     dl = DataLoader(ds, batch_size=cfg.batch_size, shuffle=True,
-                    collate_fn=collate_ctc, num_workers=2, drop_last=True)
+                    collate_fn=collate_ctc, num_workers=cfg.num_workers,
+                    drop_last=True, persistent_workers=cfg.num_workers > 0)
 
     model = CRNN(n_freq=feature_dim(feat_cfg), vocab_size=len(vocab)).to(device)
     print(f"device={device}  params={count_params(model):,}  vocab={len(vocab)}")
@@ -102,12 +106,32 @@ def train(cfg: TrainConfig, aug: AugmentConfig | None = None,
             if step % cfg.log_every == 0:
                 mcer, pairs = evaluate(model, monitor_batch, vocab, device)
                 print(f"step {step:5d}  loss {loss.item():7.3f}  "
-                      f"train_cer {mcer*100:5.1f}%")
+                      f"train_cer {mcer*100:5.1f}%", flush=True)
                 if step % (cfg.log_every * 4) == 0 and pairs:
                     r, h = pairs[0]
                     print(f"        ref: {r[:60]!r}")
-                    print(f"        hyp: {h[:60]!r}")
+                    print(f"        hyp: {h[:60]!r}", flush=True)
+            if cfg.save_path and step > 0 and step % cfg.save_every == 0:
+                _save(model, vocab, feat_cfg, cfg.save_path)
+                print(f"        checkpoint -> {cfg.save_path} (step {step})", flush=True)
             step += 1
             if step >= cfg.steps:
                 break
+    if cfg.save_path:
+        _save(model, vocab, feat_cfg, cfg.save_path)
     return model
+
+
+def _save(model: CRNN, vocab: Vocabulary, feat_cfg: FeatureConfig, path: str) -> None:
+    """Save weights + the config needed to rebuild and run the model."""
+    import os
+    os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+    torch.save(
+        {
+            "state_dict": model.state_dict(),
+            "n_freq": feature_dim(feat_cfg),
+            "vocab_size": len(vocab),
+            "feat_cfg": vars(feat_cfg),
+        },
+        path,
+    )
