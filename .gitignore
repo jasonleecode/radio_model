@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*.wav
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+# model checkpoints / datasets (large)
+*.pt
+*.ckpt
+data/
+runs/

@@ -1,0 +1,5 @@
+numpy>=1.26
+scipy>=1.11
+torch>=2.0          # perception model (stage 3)
+sounddevice>=0.4    # real-time audio I/O (stage 4); WAV-only work doesn't need it
+pytest>=7           # tests
