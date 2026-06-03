@@ -26,7 +26,8 @@
 | 0 | 执行层：文本→键控音频（兼作训练数据合成器） | ✅ 完成 |
 | 1 | DSP baseline 解码器（建立闭环 + 模型对照基线，**复用为元数据旁路**） | ✅ 完成 |
 | 2 | 决策层状态机（最小自动应答 demo 成立） | ✅ 完成 |
-| 3 | CRNN+CTC 模型（窄带频谱图，合成数据+增强训练，DSP 作对照） | 待办 |
+| 3a | 数据管线：词表/语料/特征/数据集 + 6 维增强 | ✅ 完成 |
+| 3b | CRNN+CTC 模型 + 训练循环 + 对照 baseline 评测 | 待办 |
 | 4 | 真实电台硬化：邻台/衰落/自动增益/选频 | 待办 |
 
 ## 已实现
@@ -38,7 +39,12 @@
 - `radio_cw/channel.py` — 信道损伤（白噪声/QSB/QRM），eval 与 stage-3 增强共用。
 - `radio_cw/metrics.py` — 编辑距离 / CER。
 - `radio_cw/decision.py` — 决策层 QSO 状态机 + 模板，SNR→RST，来报解析。
+- `radio_cw/vocab.py` — CTC 词表/tokenizer，处理莫尔斯码冲突归一（`=`/`<BT>` 等）。
+- `radio_cw/corpus.py` — 拟真 CW 语料生成器（呼号/RST/话术/缩写）。
+- `radio_cw/features.py` — 窄带 log-频谱图（短窗短跳步，16 bins / 250 Hz）。
+- `radio_cw/dataset.py` — 在线合成数据集 + 6 维增强 + CTC collate + 时长截断。
 - `scripts/demo_synth.py` — 渲染消息到 WAV。
+- `scripts/demo_dataset.py` — 检视训练样本与 batch 统计。
 - `scripts/eval_baseline.py` — baseline CER 基准（机器码 vs 人手 fist）。
 - `scripts/demo_qso.py` — 端到端闭环：两台站穿过音频管线完成一次完整通联。
 

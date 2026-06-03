@@ -91,6 +91,31 @@ def _gaps(cfg: SynthConfig) -> tuple[float, float, float, float, float]:
     return dit, dah, intra, inter, word
 
 
+def estimate_duration(text: str, cfg: SynthConfig | None = None) -> float:
+    """Predict the rendered duration (seconds) without building audio.
+
+    Mirrors the gap logic in ``synthesize`` (ignoring jitter, which is ~0 mean).
+    Used to cap/truncate clips so training batches stay a sane length.
+    """
+    cfg = cfg or SynthConfig()
+    dit, dah, intra, inter, word = _gaps(cfg)
+    total = cfg.lead_silence_s + cfg.tail_silence_s
+    prev_char = False
+    for pat in text_to_morse(text):
+        if pat == " ":
+            total += word
+            prev_char = False
+            continue
+        if prev_char:
+            total += inter
+        for i, sym in enumerate(pat):
+            if i > 0:
+                total += intra
+            total += dit if sym == "." else dah * cfg.weight_bias
+        prev_char = True
+    return total
+
+
 def synthesize(
     text: str,
     cfg: SynthConfig | None = None,
