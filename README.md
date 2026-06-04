@@ -30,7 +30,8 @@
 | 3b | CRNN+CTC 模型 + 训练循环（smoke test 通过） | ✅ 完成 |
 | 3c | 正式训练 + 对照 baseline 评测（CER 分桶） | ✅ 完成 |
 | 3d | 模型接进闭环（统一感知层，模型/DSP 可互换） | ✅ 完成 |
-| 4 | 真实电台硬化：邻台/衰落/自动增益/选频 | 待办 |
+| 4a | 实时 GUI：麦克风收 CW → 解码 → 喇叭回复（自动回复可选） | ✅ 完成 |
+| 4b | 真实电台硬化：邻台/衰落/自动增益/选频 | 待办 |
 
 ## 已实现
 
@@ -52,6 +53,26 @@
 - `scripts/demo_dataset.py` — 检视训练样本与 batch 统计。
 - `scripts/train_model.py` — 训练模型；`--smoke` 跑过拟合自检。
 - `scripts/eval_model.py` — 模型 vs DSP baseline 同数据对照评测（CER 分桶）。
+- `radio_cw/audio_io.py` — 声卡设备枚举 / 8k 重采样 / 播放。
+- `radio_cw/live.py` — 实时引擎：CW 活动门（流式分段）+ LiveEngine（麦克风→解码→可选自动回复→喇叭，半双工）。
+- `scripts/live_gui.py` — Tkinter 实时界面。
+
+### 实时 GUI（阶段 4a）
+
+把手台/收音机的喇叭对着电脑麦克风（或线路接入），运行：
+
+```bash
+python scripts/live_gui.py
+```
+
+选输入设备 → Start，解码的报文实时滚动显示。功能：
+- **解码后端界面可切**：DSP baseline / 训练的模型（默认 DSP，真实麦克风音频上更稳）。
+- **回合制**：检测到一段发报结束（静音 > 词间隔）才整段解码——CW 本就一问一答。
+- **半双工**：发报时自动静音麦克风，避免解码到自己的侧音。
+- **自动回复（默认关闭）**：开启后由 QSO 状态机自动应答；关闭时用输入框手动发，或 CQ / 599 / 73 一键预设。
+- 实时显示检测到的 频率 / SNR / WPM / 输入电平。
+
+> ⚠️ 自动回复 + 接真实电台 = 自动发射，需执照且多地限制无人值守。开发期建议音频回环/假负载/纯接收。
 - `scripts/eval_baseline.py` — baseline CER 基准（机器码 vs 人手 fist）。
 - `scripts/demo_qso.py` — 端到端闭环：两台站穿过音频管线完成一次完整通联。
 
