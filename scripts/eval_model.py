@@ -21,28 +21,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from radio_cw.corpus import CorpusSampler  # noqa: E402
 from radio_cw.dataset import render_audio  # noqa: E402
 from radio_cw.decode_dsp import decode_audio  # noqa: E402
-from radio_cw.features import FeatureConfig, spectrogram  # noqa: E402
 from radio_cw.metrics import cer  # noqa: E402
-from radio_cw.model import CRNN  # noqa: E402
-from radio_cw.train import greedy_decode_batch  # noqa: E402
+from radio_cw.perception import load_model, model_decode_audio  # noqa: E402
 from radio_cw.vocab import Vocabulary  # noqa: E402
-
-
-def load_model(path: str, device: torch.device) -> tuple[CRNN, FeatureConfig]:
-    ckpt = torch.load(path, map_location=device)
-    feat_cfg = FeatureConfig(**ckpt["feat_cfg"])
-    model = CRNN(n_freq=ckpt["n_freq"], vocab_size=ckpt["vocab_size"]).to(device)
-    model.load_state_dict(ckpt["state_dict"])
-    model.eval()
-    return model, feat_cfg
-
-
-@torch.no_grad()
-def model_decode(model, feat_cfg, audio, vocab, device) -> str:
-    feats = torch.from_numpy(spectrogram(audio, feat_cfg).T).unsqueeze(0).to(device)
-    log_probs = model(feats)  # (T', 1, C)
-    out_len = model.output_lengths(torch.tensor([feats.shape[1]]), log_probs.shape[0])
-    return greedy_decode_batch(log_probs, out_len, vocab)[0]
 
 
 def _norm(text: str, vocab: Vocabulary) -> str:
@@ -62,7 +43,7 @@ def eval_bucket(model, feat_cfg, vocab, device, texts, params_fn, rng):
         params = params_fn(rng)
         audio = render_audio(text, params, rng, feat_cfg.sample_rate)
         dsp_text, _ = decode_audio(audio, feat_cfg.sample_rate)
-        mdl_text = model_decode(model, feat_cfg, audio, vocab, device)
+        mdl_text = model_decode_audio(model, feat_cfg, vocab, audio, device)
         ref = _norm(text, vocab)
         dsp_errs.append(cer(ref, _norm(dsp_text, vocab)))
         mdl_errs.append(cer(ref, mdl_text))  # model output already canonical
@@ -78,9 +59,7 @@ def main() -> None:
 
     device = (torch.device("cuda" if torch.cuda.is_available() else "cpu")
               if args.device == "auto" else torch.device(args.device))
-    vocab = Vocabulary()
-    model, feat_cfg = load_model(args.ckpt, device)
-    sr = feat_cfg.sample_rate
+    model, feat_cfg, vocab = load_model(args.ckpt, device)
     print(f"loaded {args.ckpt}  device={device}\n")
 
     corpus = CorpusSampler(seed=123)

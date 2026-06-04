@@ -29,6 +29,7 @@
 | 3a | 数据管线：词表/语料/特征/数据集 + 6 维增强 | ✅ 完成 |
 | 3b | CRNN+CTC 模型 + 训练循环（smoke test 通过） | ✅ 完成 |
 | 3c | 正式训练 + 对照 baseline 评测（CER 分桶） | ✅ 完成 |
+| 3d | 模型接进闭环（统一感知层，模型/DSP 可互换） | ✅ 完成 |
 | 4 | 真实电台硬化：邻台/衰落/自动增益/选频 | 待办 |
 
 ## 已实现
@@ -46,6 +47,7 @@
 - `radio_cw/dataset.py` — 在线合成数据集 + 6 维增强 + CTC collate + 时长截断。
 - `radio_cw/model.py` — CRNN+CTC 模型（~0.5M 参数，CNN→BiGRU→Linear）。
 - `radio_cw/train.py` — CTC 训练循环 + 贪心解码 CER 监控。
+- `radio_cw/perception.py` — 统一感知层：`DSPPerception` / `ModelPerception` 同签名互换，元数据均来自 DSP 旁路（混合架构）。
 - `scripts/demo_synth.py` — 渲染消息到 WAV。
 - `scripts/demo_dataset.py` — 检视训练样本与 batch 统计。
 - `scripts/train_model.py` — 训练模型；`--smoke` 跑过拟合自检。
@@ -92,6 +94,18 @@ torch_env/bin/python scripts/eval_model.py runs/crnn.pt --n 40
 | 30  | 0.0 / 1.0 | 6.9 / **2.4**  | 28.7 / **15.1** |
 
 **诚实结论**：干净机器码上 DSP 略胜（0% vs 模型 ~1% 残差地板）；但人手节奏抖动越大，模型优势越明显（j=0.3 时约 2× 更好），极低 SNR 也略占优。模型恰好在它被设计来对付的"凌乱人手信号"上赢。验证了项目核心假设。
+
+### 模型接进闭环（阶段 3d）
+
+```bash
+torch_env/bin/python scripts/demo_qso.py --model runs/crnn.pt   # 模型驱动整个 QSO
+python scripts/demo_qso.py --jitter 0.3                          # DSP，对比
+```
+
+模型成功接入闭环，完成完整 QSO（最初设想的"感知层用模型"实现了）。两个诚实发现：
+
+1. **闭环是"全有或全无"的严苛测试**：一次通联要连续 ~6 次准确解出呼号才不中断。模型的 CER 优势体现在 `eval_model.py` 的分桶表里，而非二元的 QSO 成功率——低抖动时 DSP 的"精确性"反而占优，高抖动时两者在严苛解析下都吃力。
+2. **噪声分布外（OOD）bug**：模型训练时 SNR ∈ [−3,25]dB，**从没见过无噪声音频**，所以纯净信道解码会崩（per-clip 归一化把静音压到 log 地板，分布外）。真实电台从无纯净信道，故 demo 的模型路径默认加轻噪声。**待改进**：训练增强应纳入偶发的极高 SNR/近无噪声样本。
 
 ## ⚠️ 训练环境注意（GPU）
 
